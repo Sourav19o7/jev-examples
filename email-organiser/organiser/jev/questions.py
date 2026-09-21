@@ -16,10 +16,10 @@ CATEGORIES = {
 
 URGENCY_LEVELS = [
     "No action ever needed. Safe to archive unread.",
-    "Purely informational. Read whenever convenient.",
-    "Worth reading this week. No deadline attached.",
-    "Needs attention in the next day or two, or has a soft deadline.",
-    "Time-critical. A hard deadline, outage, or consequence lands within roughly 24 hours.",
+    "Purely informational, or the only deadline is one an automated system resolves by itself. Read whenever convenient.",
+    "Worth reading this week. Any deadline is soft, or missing it costs the recipient nothing they would mind.",
+    "The recipient must personally do something within a few days, and missing it has a real cost.",
+    "The recipient must personally act within about a day to avoid losing money, access, or an opportunity they cannot recover.",
 ]
 
 
@@ -47,6 +47,16 @@ def build_questions() -> dict:
             criteria={
                 "true": "A person asked the recipient a question, made a request, or is awaiting a decision.",
                 "false": "Automated mail, bulk mail, or a message that is purely informational or already resolved.",
+            },
+        ),
+        "owner_must_act": Noul(
+            instructions=(
+                "Must the recipient personally do something, beyond reading, for this "
+                "to be resolved?"
+            ),
+            criteria={
+                "true": "It stays unresolved, or something is lost, unless the recipient takes an action themselves.",
+                "false": "A system, sender, or deadline resolves it on its own, or it merely reports something that already happened.",
             },
         ),
         "bulk_archivable": Noul(

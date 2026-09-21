@@ -13,6 +13,9 @@ ARCHIVE_CONFIDENCE_FLOOR = 0.85
 ARCHIVE_PROBABILITY_FLOOR = 0.85
 NEEDS_REPLY_FLOOR = 0.7
 URGENT_SCORE_FLOOR = 3.0
+# A deadline only matters if the owner is the one who has to meet it, so an
+# urgent-looking notice that resolves itself never earns the urgent label.
+MUST_ACT_FLOOR = 0.5
 
 # Categories where a wrong archive costs the user something irreversible.
 NEVER_ARCHIVE = {"personal", "work", "security", "transactional"}
@@ -55,7 +58,10 @@ def decide(judgement: Judgement) -> Plan:
     if judgement.needs_reply >= NEEDS_REPLY_FLOOR:
         plan.add_labels.append(f"{LABEL_PREFIX}/needs-reply")
 
-    if judgement.urgency >= URGENT_SCORE_FLOOR:
+    if (
+        judgement.urgency >= URGENT_SCORE_FLOOR
+        and judgement.owner_must_act >= MUST_ACT_FLOOR
+    ):
         plan.add_labels.append(f"{LABEL_PREFIX}/urgent")
 
     plan.archive = (

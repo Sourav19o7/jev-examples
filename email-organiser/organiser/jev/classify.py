@@ -19,6 +19,7 @@ class Judgement:
     urgency: float
     urgency_confidence: float
     needs_reply: float
+    owner_must_act: float
     bulk_archivable: float
     urgency_legend: dict | None = None
     error: str | None = None
@@ -46,6 +47,7 @@ async def _judge_one(client, email: Email, owner: str, model: str) -> Judgement:
             urgency=0.0,
             urgency_confidence=0.0,
             needs_reply=0.0,
+            owner_must_act=0.0,
             bulk_archivable=0.0,
             error=f"{exc.__class__.__name__}: {exc}",
         )
@@ -61,6 +63,7 @@ async def _judge_one(client, email: Email, owner: str, model: str) -> Judgement:
         urgency_confidence=urgency.confidence,
         urgency_legend=dict(urgency.legend) if urgency.legend else None,
         needs_reply=response.nouls["needs_reply"].noul,
+        owner_must_act=response.nouls["owner_must_act"].noul,
         bulk_archivable=response.nouls["bulk_archivable"].noul,
     )
 

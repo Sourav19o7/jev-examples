@@ -26,6 +26,7 @@ def render(plans: list[Plan], apply_mode: bool) -> None:
     table.add_column("Conf", justify="right")
     table.add_column("Urg", justify="right")
     table.add_column("Reply", justify="right")
+    table.add_column("Act", justify="right")
     table.add_column("Action", style="magenta")
 
     for plan in sorted(plans, key=lambda p: p.judgement.urgency, reverse=True):
@@ -48,6 +49,7 @@ def render(plans: list[Plan], apply_mode: bool) -> None:
             f"{j.category_confidence:.2f}",
             f"{j.urgency:.1f}",
             f"{j.needs_reply:.2f}",
+            f"{j.owner_must_act:.2f}",
             f"{action} {labels}".strip(),
         )
 
