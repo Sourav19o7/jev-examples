@@ -1,0 +1,23 @@
+[project]
+name = "email-organiser"
+version = "0.1.0"
+description = "Organise Gmail with TypeSafe Jev typed decisions"
+requires-python = ">=3.10"
+dependencies = [
+    "typesafe-sdk",
+    "google-api-python-client",
+    "google-auth-oauthlib",
+    "beautifulsoup4",
+    "python-dotenv",
+    "rich",
+]
+
+[project.scripts]
+organise = "organiser.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["organiser*"]
