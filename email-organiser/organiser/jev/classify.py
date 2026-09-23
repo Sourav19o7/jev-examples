@@ -22,6 +22,7 @@ class Judgement:
     owner_must_act: float
     bulk_archivable: float
     urgency_legend: dict | None = None
+    input_tokens: int = 0
     error: str | None = None
 
     @property
@@ -65,6 +66,7 @@ async def _judge_one(client, email: Email, owner: str, model: str) -> Judgement:
         needs_reply=response.nouls["needs_reply"].noul,
         owner_must_act=response.nouls["owner_must_act"].noul,
         bulk_archivable=response.nouls["bulk_archivable"].noul,
+        input_tokens=response.usage.input_tokens or 0,
     )
 
 

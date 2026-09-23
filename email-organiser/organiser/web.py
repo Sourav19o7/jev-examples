@@ -16,6 +16,7 @@ from organiser.gmail import labels as labels_module
 from organiser.gmail.auth import get_owner_address, get_service
 from organiser.gmail.messages import fetch, sender_name
 from organiser.jev.classify import judge_all
+from organiser.jev.pricing import USD_PER_MILLION_INPUT_TOKENS, cost_usd
 from organiser.policy import Plan, plan_all
 
 DEFAULT_QUERY = "in:inbox is:unread newer_than:7d"
@@ -49,6 +50,8 @@ def _serialise(plan: Plan) -> dict:
         "archive": plan.archive,
         "needs_review": plan.needs_review,
         "review_reasons": plan.review_reasons,
+        "input_tokens": j.input_tokens,
+        "error": j.error,
     }
 
 
@@ -75,7 +78,20 @@ def scan(limit: int = 25, query: str = DEFAULT_QUERY) -> dict:
         _scanned.clear()
         _scanned.update({p.judgement.email.id: p for p in plans})
 
-    return {"owner": owner, "rows": [_serialise(p) for p in plans], "error": None}
+    tokens = sum(p.judgement.input_tokens for p in plans)
+    failed = sum(1 for p in plans if p.judgement.error)
+    return {
+        "owner": owner,
+        "rows": [_serialise(p) for p in plans],
+        "usage": {
+            "input_tokens": tokens,
+            "cost_usd": cost_usd(tokens),
+            "rate_per_mtok": USD_PER_MILLION_INPUT_TOKENS,
+            "emails": len(plans),
+            "failed": failed,
+        },
+        "error": None,
+    }
 
 
 @app.post("/api/apply")

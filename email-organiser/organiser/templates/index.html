@@ -55,6 +55,11 @@
     font: inherit; padding: 9px 12px; border: 1px solid var(--rule-strong);
     background: var(--paper); color: var(--ink); border-radius: 0;
   }
+  input[type="number"]#limit {
+    width: 124px; font-family: "IBM Plex Mono", monospace;
+    font-size: 30px; font-weight: 500; text-align: center;
+    padding: 10px 8px; border: 2px solid var(--ink); letter-spacing: -0.01em;
+  }
   input[type="text"] { min-width: 300px; font-family: "IBM Plex Mono", monospace; font-size: 12.5px; }
   input:focus { outline: 2px solid var(--ink); outline-offset: -1px; }
 
@@ -115,6 +120,51 @@
   .tally { font-family: "IBM Plex Mono", monospace; font-size: 13px; }
   .tally b { font-weight: 500; }
 
+  /* pipeline + meter */
+  .rig { border: 1px solid var(--rule); margin-bottom: 26px; display: none; }
+  .rig.on { display: block; }
+
+  .stages { display: grid; grid-template-columns: repeat(4, 1fr); }
+  .stage { padding: 15px 18px; border-right: 1px solid var(--rule); position: relative; }
+  .stage:last-child { border-right: 0; }
+  .stage .n {
+    font-family: "IBM Plex Mono", monospace; font-size: 10px;
+    color: var(--faint); letter-spacing: .1em;
+  }
+  .stage .t {
+    font-size: 12.5px; font-weight: 600; letter-spacing: .06em;
+    text-transform: uppercase; margin-top: 3px; color: var(--faint);
+    transition: color .2s;
+  }
+  .stage .d { font-size: 11.5px; color: var(--faint); margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .stage.active .t, .stage.done .t { color: var(--ink); }
+  .stage.active { background: #f7f7f7; }
+  .stage.active::after {
+    content: ""; position: absolute; left: 0; bottom: 0; height: 2px;
+    background: var(--ink); width: 100%; transform-origin: left;
+    animation: sweep 1.1s ease-in-out infinite;
+  }
+  .stage.done::after {
+    content: ""; position: absolute; left: 0; bottom: 0; height: 2px;
+    background: var(--ink); width: 100%;
+  }
+  @keyframes sweep { 0% { transform: scaleX(0); } 50% { transform: scaleX(1); } 100% { transform: scaleX(0); transform-origin: right; } }
+
+  .meter { border-top: 1px solid var(--rule); padding: 15px 18px; display: flex;
+           align-items: center; gap: 26px; flex-wrap: wrap; }
+  .gauge { flex: 1 1 260px; min-width: 200px; }
+  .gauge .track { height: 7px; background: #ededed; position: relative; overflow: hidden; }
+  .gauge .fill { height: 100%; background: var(--ink); width: 0; transition: width .45s cubic-bezier(.2,.8,.2,1); }
+  .gauge .ends { display: flex; justify-content: space-between; margin-top: 5px;
+                 font-family: "IBM Plex Mono", monospace; font-size: 10px; color: var(--faint); }
+
+  .readout { display: flex; gap: 26px; }
+  .stat .k { font-size: 9.5px; text-transform: uppercase; letter-spacing: .13em;
+             color: var(--muted); font-weight: 600; }
+  .stat .v { font-family: "IBM Plex Mono", monospace; font-size: 21px;
+             font-weight: 500; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .stat .v small { font-size: 11px; color: var(--faint); font-weight: 400; }
+
   .msg { padding: 14px 18px; border-left: 3px solid var(--ink); background: #f5f5f5;
          margin-bottom: 22px; font-size: 13.5px; }
   .msg.err { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; }
@@ -144,6 +194,26 @@
     <button id="scan">Scan inbox</button>
   </div>
 
+  <div class="rig" id="rig">
+    <div class="stages">
+      <div class="stage" data-s="fetch"><div class="n">01</div><div class="t">Fetch</div><div class="d" data-d="fetch">—</div></div>
+      <div class="stage" data-s="judge"><div class="n">02</div><div class="t">Jev judges</div><div class="d" data-d="judge">—</div></div>
+      <div class="stage" data-s="decide"><div class="n">03</div><div class="t">Policy decides</div><div class="d" data-d="decide">—</div></div>
+      <div class="stage" data-s="apply"><div class="n">04</div><div class="t">Apply</div><div class="d" data-d="apply">—</div></div>
+    </div>
+    <div class="meter">
+      <div class="gauge">
+        <div class="track"><div class="fill" id="fill"></div></div>
+        <div class="ends"><span id="spent">0 tokens</span><span id="budget">budget —</span></div>
+      </div>
+      <div class="readout">
+        <div class="stat"><div class="k">Tokens in</div><div class="v" id="tok">0</div></div>
+        <div class="stat"><div class="k">Cost</div><div class="v" id="cost">$0</div></div>
+        <div class="stat"><div class="k">Per email</div><div class="v" id="per">—</div></div>
+      </div>
+    </div>
+  </div>
+
   <div id="message"></div>
   <div id="content"><div class="empty">Run a scan to see proposals.</div></div>
 </div>
@@ -151,6 +221,47 @@
 <script>
 const $ = s => document.querySelector(s);
 let rows = [], applied = false;
+
+// Measured across real scans: a five-question request averages ~1.9k input
+// tokens per email. Only used to scale the gauge before the true total lands.
+const EXPECTED_TOKENS_PER_EMAIL = 2000;
+const RATE_PER_MTOK = 0.042;
+
+const money = usd => usd === 0 ? "$0"
+  : usd < 0.01 ? (usd * 100).toFixed(3) + "¢"
+  : "$" + usd.toFixed(4);
+
+function stage(name, state, detail) {
+  const el = document.querySelector(`.stage[data-s="${name}"]`);
+  if (!el) return;
+  el.classList.remove("active", "done");
+  if (state) el.classList.add(state);
+  if (detail !== undefined) document.querySelector(`[data-d="${name}"]`).textContent = detail;
+}
+
+function resetRig(limit) {
+  $("#rig").classList.add("on");
+  ["fetch","judge","decide","apply"].forEach(s => stage(s, null, "—"));
+  const budget = limit * EXPECTED_TOKENS_PER_EMAIL;
+  $("#budget").textContent = `est. ${budget.toLocaleString()} tokens`;
+  $("#spent").textContent = "0 tokens";
+  $("#fill").style.width = "0%";
+  $("#tok").textContent = "0";
+  $("#cost").textContent = "$0";
+  $("#per").textContent = "—";
+  return budget;
+}
+
+function meter(tokens, emails, budget) {
+  const usd = tokens / 1e6 * RATE_PER_MTOK;
+  $("#tok").textContent = tokens.toLocaleString();
+  $("#cost").textContent = money(usd);
+  $("#per").innerHTML = emails
+    ? Math.round(tokens / emails).toLocaleString() + ' <small>tok</small>'
+    : "—";
+  $("#spent").textContent = `${tokens.toLocaleString()} tokens`;
+  $("#fill").style.width = Math.min(100, budget ? tokens / budget * 100 : 0) + "%";
+}
 
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
@@ -161,22 +272,54 @@ function note(html, cls = "") {
 async function scan() {
   const btn = $("#scan");
   btn.disabled = true;
-  btn.innerHTML = '<span class="spin"></span>Judging…';
+  btn.innerHTML = '<span class="spin"></span>Running…';
   note("");
-  $("#content").innerHTML = '<div class="empty">Fetching mail and asking Jev — this takes a moment.</div>';
+  $("#content").innerHTML = '<div class="empty">Working…</div>';
+
+  const limitNum = Math.max(1, parseInt($("#limit").value, 10) || 25);
+  const budget = resetRig(limitNum);
+
+  // The scan is one round trip, so stage progress is indicative: fetch is brief,
+  // the judging phase is where nearly all the wall-clock goes.
+  stage("fetch", "active", "reading inbox");
+  const t0 = performance.now();
+  let judging;
 
   try {
-    const limit = encodeURIComponent($("#limit").value);
-    const query = encodeURIComponent($("#query").value);
-    const r = await fetch(`/api/scan?limit=${limit}&query=${query}`);
-    const data = await r.json();
+    const q = encodeURIComponent($("#query").value);
+    const req = fetch(`/api/scan?limit=${limitNum}&query=${q}`);
 
-    if (data.error) { note(esc(data.error), "err"); $("#content").innerHTML = '<div class="empty">Scan failed.</div>'; return; }
+    judging = setTimeout(() => {
+      stage("fetch", "done", "done");
+      stage("judge", "active", `up to ${limitNum} emails`);
+    }, 900);
+
+    const data = await (await req).json();
+    clearTimeout(judging);
+
+    if (data.error) {
+      stage("fetch", null, "—"); stage("judge", null, "—");
+      note(esc(data.error), "err");
+      $("#content").innerHTML = '<div class="empty">Scan failed.</div>';
+      return;
+    }
+
     if (data.owner) $("#owner").textContent = `${data.owner} · review before applying`;
+
+    const u = data.usage || {};
+    const secs = ((performance.now() - t0) / 1000).toFixed(1);
+    stage("fetch", "done", `${data.rows.length} fetched`);
+    stage("judge", "done", `${u.emails || 0} judged · ${secs}s`);
+    stage("decide", "done", `${data.rows.filter(r => r.needs_review).length} held`);
+    stage("apply", null, "awaiting your approval");
+    meter(u.input_tokens || 0, u.emails || 0, budget);
+
+    if (u.failed) note(`${u.failed} email(s) failed to judge and are held for review.`);
 
     rows = data.rows; applied = false;
     rows.length ? render() : ($("#content").innerHTML = '<div class="empty">No messages matched that query.</div>');
   } catch (e) {
+    clearTimeout(judging);
     note(esc(e.message), "err");
   } finally {
     btn.disabled = false;
@@ -255,6 +398,7 @@ async function apply() {
   const btn = $("#apply");
   btn.disabled = true;
   btn.innerHTML = '<span class="spin"></span>Writing…';
+  stage("apply", "active", "writing to Gmail");
 
   try {
     const r = await fetch("/api/apply", {
@@ -264,14 +408,19 @@ async function apply() {
     });
     const d = await r.json();
 
-    if (d.error) { note(esc(d.error), "err"); btn.disabled = false; tally(); return; }
+    if (d.error) {
+      stage("apply", null, "failed");
+      note(esc(d.error), "err"); btn.disabled = false; tally(); return;
+    }
 
     applied = true;
+    stage("apply", "done", `${d.labelled} labelled · ${d.archived} archived`);
     note(`Wrote <b>${d.labelled}</b> labelled and <b>${d.archived}</b> archived to Gmail. Scan again to continue.`);
     document.querySelectorAll("tbody input[type=checkbox]").forEach(c => c.disabled = true);
     btn.textContent = "Applied";
     window.scrollTo({ top: 0, behavior: "smooth" });
   } catch (e) {
+    stage("apply", null, "failed");
     note(esc(e.message), "err");
     btn.disabled = false;
   }
