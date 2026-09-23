@@ -156,8 +156,8 @@
   .tally b { font-weight: 500; }
 
   /* pipeline + meter */
-  .rig { border: 1px solid var(--rule); margin-bottom: 26px; display: none; }
-  .rig.on { display: block; }
+  .rig { border: 1px solid var(--rule); margin-bottom: 26px; }
+  .rig.idle { opacity: .55; }
 
   .stages { display: grid; grid-template-columns: repeat(4, 1fr); }
   .stage { padding: 15px 18px; border-right: 1px solid var(--rule); position: relative; }
@@ -200,6 +200,47 @@
              font-weight: 500; margin-top: 2px; font-variant-numeric: tabular-nums; }
   .stat .v small { font-size: 11px; color: var(--faint); font-weight: 400; }
 
+  /* dashboard grid */
+  .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 26px; margin-bottom: 26px; }
+  @media (max-width: 980px) { .grid { grid-template-columns: 1fr; } }
+
+  .card { border: 1px solid var(--rule); }
+  .card > h3 {
+    margin: 0; padding: 12px 18px; border-bottom: 1px solid var(--rule);
+    font-size: 9.5px; text-transform: uppercase; letter-spacing: .14em;
+    color: var(--muted); font-weight: 600; display: flex; justify-content: space-between;
+  }
+  .card > h3 b { font-family: "IBM Plex Mono", monospace; color: var(--ink);
+                 font-weight: 500; letter-spacing: 0; text-transform: none; }
+  .card .bd { padding: 16px 18px; }
+
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); }
+  .tile { padding: 15px 18px; border-right: 1px solid var(--rule); }
+  .tile:last-child { border-right: 0; }
+  .tile .k { font-size: 9.5px; text-transform: uppercase; letter-spacing: .13em;
+             color: var(--muted); font-weight: 600; }
+  .tile .v { font-family: "IBM Plex Mono", monospace; font-size: 27px; font-weight: 500;
+             margin-top: 3px; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .tile .v.dim { color: var(--faint); }
+  .tile .s { font-size: 10.5px; color: var(--faint); margin-top: 2px; }
+
+  .hist { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 9px; align-items: center; }
+  .hist .l { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .hist .b { height: 10px; background: #ededed; }
+  .hist .b i { display: block; height: 100%; background: var(--ink); width: 0;
+               transition: width .5s cubic-bezier(.2,.8,.2,1); }
+  .hist .c { font-family: "IBM Plex Mono", monospace; font-size: 11px;
+             color: var(--muted); font-variant-numeric: tabular-nums; }
+  .hist .empty-note { grid-column: 1/4; font-size: 11.5px; color: var(--faint); font-style: italic; }
+
+  .split { display: flex; gap: 0; height: 11px; margin: 4px 0 9px; }
+  .split span { display: block; height: 100%; }
+  .split .a { background: var(--ink); }
+  .split .b { background: var(--rule-strong); }
+  .split .c { background: #e0e0e0; }
+  .legend { display: flex; gap: 16px; font-size: 10.5px; color: var(--muted); flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 9px; height: 9px; margin-right: 5px; vertical-align: -1px; }
+
   .msg { padding: 14px 18px; border-left: 3px solid var(--ink); background: #f5f5f5;
          margin-bottom: 22px; font-size: 13.5px; }
   .msg.err { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; }
@@ -229,7 +270,38 @@
     <button id="scan">Scan inbox</button>
   </div>
 
-  <div class="rig" id="rig">
+  <div class="tiles card" style="margin-bottom:26px">
+    <div class="tile"><div class="k">Scanned</div><div class="v dim" id="t-scan">0</div><div class="s" id="t-scan-s">no scan yet</div></div>
+    <div class="tile"><div class="k">To label</div><div class="v dim" id="t-lab">0</div><div class="s" id="t-lab-s">—</div></div>
+    <div class="tile"><div class="k">To archive</div><div class="v dim" id="t-arc">0</div><div class="s" id="t-arc-s">opt in per row</div></div>
+    <div class="tile"><div class="k">Held</div><div class="v dim" id="t-held">0</div><div class="s" id="t-held-s">low confidence</div></div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h3>Category mix <b id="h-cat">—</b></h3>
+      <div class="bd"><div class="hist" id="hist"><div class="empty-note">Run a scan to see how your inbox breaks down.</div></div></div>
+    </div>
+    <div class="card">
+      <h3>Signals</h3>
+      <div class="bd">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:2px">Confidence spread</div>
+        <div class="split" id="split"><span class="c" style="width:100%"></span></div>
+        <div class="legend">
+          <span><i style="background:#000"></i>high ≥.85 <b id="l-hi">0</b></span>
+          <span><i style="background:#9e9e9e"></i>mid <b id="l-mid">0</b></span>
+          <span><i style="background:#e0e0e0"></i>low &lt;.6 <b id="l-lo">0</b></span>
+        </div>
+        <div class="facts" style="margin-top:16px">
+          <div class="fact">needs reply <b id="s-reply">0</b></div>
+          <div class="fact">urgent <b id="s-urg">0</b></div>
+          <div class="fact">must act <b id="s-act">0</b></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rig idle" id="rig">
     <div class="stages">
       <div class="stage" data-s="fetch"><div class="n">01</div><div class="t">Fetch</div><div class="d" data-d="fetch">—</div></div>
       <div class="stage" data-s="judge"><div class="n">02</div><div class="t">Jev judges</div><div class="d" data-d="judge">—</div></div>
@@ -245,6 +317,8 @@
         <div class="stat"><div class="k">Tokens in</div><div class="v" id="tok">0</div></div>
         <div class="stat"><div class="k">Cost</div><div class="v" id="cost">$0</div></div>
         <div class="stat"><div class="k">Per email</div><div class="v" id="per">—</div></div>
+        <div class="stat"><div class="k">Elapsed</div><div class="v" id="secs">—</div></div>
+        <div class="stat"><div class="k">Rate</div><div class="v" id="rate">—</div></div>
       </div>
     </div>
   </div>
@@ -274,8 +348,60 @@ function stage(name, state, detail) {
   if (detail !== undefined) document.querySelector(`[data-d="${name}"]`).textContent = detail;
 }
 
+function summarise(rows) {
+  const n = rows.length;
+  const lab = rows.filter(r => !r.needs_review && r.labels.length).length;
+  const arc = rows.filter(r => !r.needs_review && r.archive).length;
+  const held = rows.filter(r => r.needs_review).length;
+
+  const set = (id, v, sub) => {
+    $(id).textContent = v;
+    $(id).classList.toggle("dim", !v);
+    if (sub !== undefined) $(id + "-s").textContent = sub;
+  };
+  set("#t-scan", n, n ? "emails judged" : "no scan yet");
+  set("#t-lab", lab, lab ? "pre-ticked" : "—");
+  set("#t-arc", arc, arc ? "opt in per row" : "none proposed");
+  set("#t-held", held, held ? "below 0.60 conf" : "none");
+
+  const counts = {};
+  rows.forEach(r => { counts[r.category] = (counts[r.category] || 0) + 1; });
+  const ordered = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const max = ordered[0]?.[1] || 1;
+  $("#h-cat").textContent = ordered.length ? `${ordered.length} kinds` : "—";
+  $("#hist").innerHTML = ordered.length
+    ? ordered.map(([k, c]) => `<div class="l">${esc(k)}</div>
+        <div class="b"><i style="width:${c / max * 100}%"></i></div>
+        <div class="c">${c}</div>`).join("")
+    : '<div class="empty-note">Run a scan to see how your inbox breaks down.</div>';
+
+  const hi = rows.filter(r => r.confidence >= .85).length;
+  const lo = rows.filter(r => r.confidence < .6).length;
+  const mid = n - hi - lo;
+  $("#split").innerHTML = n
+    ? `<span class="a" style="width:${hi / n * 100}%"></span>
+       <span class="b" style="width:${mid / n * 100}%"></span>
+       <span class="c" style="width:${lo / n * 100}%"></span>`
+    : '<span class="c" style="width:100%"></span>';
+  $("#l-hi").textContent = hi; $("#l-mid").textContent = mid; $("#l-lo").textContent = lo;
+
+  $("#s-reply").textContent = rows.filter(r => r.needs_reply >= .7).length;
+  $("#s-urg").textContent = rows.filter(r => r.urgency >= 3).length;
+  $("#s-act").textContent = rows.filter(r => r.owner_must_act >= .5).length;
+}
+
+let ticker = null;
+function startClock() {
+  const t0 = performance.now();
+  clearInterval(ticker);
+  ticker = setInterval(() => {
+    $("#secs").textContent = ((performance.now() - t0) / 1000).toFixed(1) + "s";
+  }, 100);
+  return t0;
+}
+
 function resetRig(limit) {
-  $("#rig").classList.add("on");
+  $("#rig").classList.remove("idle");
   ["fetch","judge","decide","apply"].forEach(s => stage(s, null, "—"));
   const budget = limit * EXPECTED_TOKENS_PER_EMAIL;
   $("#budget").textContent = `est. ${budget.toLocaleString()} tokens`;
@@ -317,7 +443,7 @@ async function scan() {
   // The scan is one round trip, so stage progress is indicative: fetch is brief,
   // the judging phase is where nearly all the wall-clock goes.
   stage("fetch", "active", "reading inbox");
-  const t0 = performance.now();
+  const t0 = startClock();
   let judging;
 
   try {
@@ -333,6 +459,7 @@ async function scan() {
     clearTimeout(judging);
 
     if (data.error) {
+      clearInterval(ticker);
       stage("fetch", null, "—"); stage("judge", null, "—");
       note(esc(data.error), "err");
       $("#content").innerHTML = '<div class="empty">Scan failed.</div>';
@@ -341,13 +468,18 @@ async function scan() {
 
     if (data.owner) $("#owner").textContent = `${data.owner} · review before applying`;
 
+    clearInterval(ticker);
     const u = data.usage || {};
-    const secs = ((performance.now() - t0) / 1000).toFixed(1);
+    const elapsed = (performance.now() - t0) / 1000;
     stage("fetch", "done", `${data.rows.length} fetched`);
-    stage("judge", "done", `${u.emails || 0} judged · ${secs}s`);
+    stage("judge", "done", `${u.emails || 0} judged · ${elapsed.toFixed(1)}s`);
     stage("decide", "done", `${data.rows.filter(r => r.needs_review).length} held`);
     stage("apply", null, "awaiting your approval");
     meter(u.input_tokens || 0, u.emails || 0, budget);
+    $("#secs").textContent = elapsed.toFixed(1) + "s";
+    $("#rate").innerHTML = elapsed
+      ? (u.emails / elapsed).toFixed(1) + ' <small>/s</small>' : "—";
+    summarise(data.rows);
 
     if (u.failed) note(`${u.failed} email(s) failed to judge and are held for review.`);
 
@@ -355,6 +487,7 @@ async function scan() {
     rows.length ? render() : ($("#content").innerHTML = '<div class="empty">No messages matched that query.</div>');
   } catch (e) {
     clearTimeout(judging);
+    clearInterval(ticker);
     note(esc(e.message), "err");
   } finally {
     btn.disabled = false;
@@ -477,6 +610,12 @@ function picked() {
 function tally() {
   const { label, archive } = picked();
   $("#tally").innerHTML = `<b>${label.length}</b> to label · <b>${archive.length}</b> to archive`;
+  // Top tiles track the live selection, not the original proposal.
+  $("#t-lab").textContent = label.length;
+  $("#t-lab").classList.toggle("dim", !label.length);
+  $("#t-arc").textContent = archive.length;
+  $("#t-arc").classList.toggle("dim", !archive.length);
+  $("#t-arc-s").textContent = archive.length ? "will leave inbox" : "none selected";
   $("#apply").disabled = applied || !label.length;
   $("#apply").textContent = archive.length
     ? `Apply ${label.length} labels, ${archive.length} archives`
