@@ -52,6 +52,17 @@ def _serialise(plan: Plan) -> dict:
         "review_reasons": plan.review_reasons,
         "input_tokens": j.input_tokens,
         "error": j.error,
+        "category_probabilities": {
+            k: round(v, 4)
+            for k, v in sorted(
+                j.category_probabilities.items(), key=lambda kv: -kv[1]
+            )
+        },
+        "urgency_confidence": round(j.urgency_confidence, 2),
+        "urgency_legend": {str(k): v for k, v in (j.urgency_legend or {}).items()},
+        "urgency_probabilities": {
+            str(k): round(v, 4) for k, v in (j.urgency_probabilities or {}).items()
+        },
     }
 
 

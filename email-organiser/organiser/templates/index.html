@@ -112,6 +112,41 @@
 
   .reasons { font-size: 11.5px; color: var(--faint); margin-top: 3px; font-style: italic; }
 
+  .disc {
+    background: none; border: 0; padding: 0; margin-top: 5px; cursor: pointer;
+    font-family: "IBM Plex Mono", monospace; font-size: 10.5px; color: var(--faint);
+    letter-spacing: .06em; text-transform: uppercase; font-weight: 400;
+  }
+  .disc:hover { color: var(--ink); background: none; }
+  .disc::before { content: "+ "; }
+  tr.open .disc::before { content: "− "; }
+
+  tr.detail > td { padding: 0 10px 22px 10px; background: #fafafa; }
+  tr.detail.hidden { display: none; }
+  .panes { display: grid; grid-template-columns: 1fr 1fr; gap: 34px; padding-top: 4px; }
+  @media (max-width: 900px) { .panes { grid-template-columns: 1fr; gap: 22px; } }
+
+  .pane h4 {
+    margin: 0 0 9px; font-size: 9.5px; text-transform: uppercase;
+    letter-spacing: .14em; color: var(--muted); font-weight: 600;
+  }
+  .pane h4 span { color: var(--faint); font-weight: 400; letter-spacing: .04em; text-transform: none; }
+
+  .dist { display: grid; grid-template-columns: auto 1fr auto; gap: 5px 10px; align-items: center; }
+  .dist .lb { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+  .dist .lb.win { color: var(--ink); font-weight: 600; }
+  .dist .bar { height: 9px; background: #e8e8e8; position: relative; }
+  .dist .bar i { position: absolute; inset: 0 auto 0 0; background: var(--rule-strong); display: block; }
+  .dist .lb.win ~ .bar i, .dist .bar.win i { background: var(--ink); }
+  .dist .pc { font-family: "IBM Plex Mono", monospace; font-size: 11px;
+              color: var(--muted); font-variant-numeric: tabular-nums; }
+  .dist .zero { opacity: .35; }
+
+  .lvl { font-size: 11px; color: var(--faint); margin-top: 2px; line-height: 1.45; }
+  .facts { display: flex; gap: 26px; margin-top: 14px; flex-wrap: wrap; }
+  .fact { font-size: 11px; color: var(--muted); }
+  .fact b { font-family: "IBM Plex Mono", monospace; color: var(--ink); font-weight: 500; }
+
   .bar {
     position: sticky; bottom: 0; background: var(--paper);
     border-top: 2px solid var(--ink); padding: 16px 0;
@@ -327,6 +362,48 @@ async function scan() {
   }
 }
 
+function distRows(entries, winner) {
+  return entries.map(([label, p, note]) => {
+    const win = String(label) === String(winner);
+    return `<div class="lb ${win ? "win" : ""} ${p < 0.005 ? "zero" : ""}">${esc(label)}</div>
+      <div class="bar ${win ? "win" : ""}"><i style="width:${Math.max(p * 100, p > 0 ? 1.5 : 0)}%"></i></div>
+      <div class="pc ${p < 0.005 ? "zero" : ""}">${(p * 100).toFixed(1)}%</div>
+      ${note ? `<div></div><div class="lvl" style="grid-column:2/4">${esc(note)}</div>` : ""}`;
+  }).join("");
+}
+
+function detail(r) {
+  const cats = Object.entries(r.category_probabilities).map(([k, v]) => [k, v, null]);
+
+  const up = r.urgency_probabilities || {};
+  const legend = r.urgency_legend || {};
+  const topLevel = Object.entries(up).sort((a, b) => b[1] - a[1])[0]?.[0];
+  const levels = Object.keys(legend).sort((a, b) => a - b)
+    .map(k => [k, up[k] ?? 0, legend[k]]);
+
+  return `<tr class="detail hidden"><td colspan="9">
+    <div class="panes">
+      <div class="pane">
+        <h4>Category distribution <span>— Choice over ${cats.length} options</span></h4>
+        <div class="dist">${distRows(cats, r.category)}</div>
+        <div class="facts">
+          <div class="fact">confidence <b>${r.confidence.toFixed(2)}</b></div>
+          <div class="fact">${r.input_tokens.toLocaleString()} input tokens</div>
+        </div>
+      </div>
+      <div class="pane">
+        <h4>Urgency rubric <span>— Score, weighted ${r.urgency.toFixed(2)}</span></h4>
+        <div class="dist">${distRows(levels, topLevel)}</div>
+        <div class="facts">
+          <div class="fact">confidence <b>${r.urgency_confidence.toFixed(2)}</b></div>
+          <div class="fact">needs reply <b>${r.needs_reply.toFixed(2)}</b></div>
+          <div class="fact">must act <b>${r.owner_must_act.toFixed(2)}</b></div>
+        </div>
+      </div>
+    </div>
+  </td></tr>`;
+}
+
 function render() {
   const body = rows.map(r => {
     const actionable = !r.needs_review && (r.labels.length || r.archive);
@@ -339,14 +416,15 @@ function render() {
            ${checked} ${actionable ? "" : "disabled"}></td>
       <td class="sender" title="${esc(r.sender)}">${esc(r.sender)}</td>
       <td class="subject">${esc(r.subject)}
-        ${r.needs_review ? `<div class="reasons">${esc(r.review_reasons.join("; "))}</div>` : ""}</td>
+        ${r.needs_review ? `<div class="reasons">${esc(r.review_reasons.join("; "))}</div>` : ""}
+        <button class="disc" data-toggle="${esc(r.id)}">why</button></td>
       <td><span class="chip ${r.archive ? "solid" : ""}">${esc(r.category)}</span></td>
       <td class="num">${r.confidence.toFixed(2)}</td>
       <td class="num ${r.urgency >= 3 ? "strong" : ""}">${r.urgency.toFixed(1)}</td>
       <td class="num ${r.needs_reply >= .7 ? "strong" : ""}">${r.needs_reply.toFixed(2)}</td>
       <td class="num">${r.owner_must_act.toFixed(2)}</td>
       <td class="act ${r.archive ? "arch" : ""}">${act}</td>
-    </tr>`;
+    </tr>${detail(r)}`;
   }).join("");
 
   $("#content").innerHTML = `
@@ -361,10 +439,24 @@ function render() {
     <div class="bar">
       <button id="apply">Apply</button>
       <button class="ghost" id="none">Clear all</button>
+      <button class="ghost" id="all">Why each?</button>
       <span class="tally" id="tally"></span>
     </div>`;
 
   $("#content").addEventListener("change", e => { if (e.target.type === "checkbox") tally(); });
+  $("#content").addEventListener("click", e => {
+    const b = e.target.closest(".disc");
+    if (!b) return;
+    const tr = b.closest("tr");
+    tr.classList.toggle("open");
+    tr.nextElementSibling.classList.toggle("hidden");
+  });
+  $("#all").addEventListener("click", () => {
+    const anyClosed = !!document.querySelector("tr.detail.hidden");
+    document.querySelectorAll("tr.detail").forEach(d => d.classList.toggle("hidden", !anyClosed));
+    document.querySelectorAll("tbody tr:not(.detail)").forEach(t => t.classList.toggle("open", anyClosed));
+    $("#all").textContent = anyClosed ? "Collapse all" : "Why each?";
+  });
   $("#apply").addEventListener("click", apply);
   $("#none").addEventListener("click", () => {
     document.querySelectorAll('tbody input[type=checkbox]').forEach(c => c.checked = false);
