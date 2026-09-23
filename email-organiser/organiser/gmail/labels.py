@@ -36,8 +36,19 @@ def ensure_labels(service, names: set[str]) -> dict[str, str]:
     return existing
 
 
-def apply(service, plans: list[Plan]) -> tuple[int, int]:
+def apply(
+    service,
+    plans: list[Plan],
+    only: set[str] | None = None,
+    archive_only: set[str] | None = None,
+) -> tuple[int, int]:
+    """`only` restricts which messages are touched, `archive_only` which get archived.
+
+    None means "no restriction", so the CLI's behaviour is unchanged.
+    """
     actionable = [p for p in plans if not p.needs_review and (p.add_labels or p.archive)]
+    if only is not None:
+        actionable = [p for p in actionable if p.judgement.email.id in only]
     if not actionable:
         return 0, 0
 
@@ -49,16 +60,18 @@ def apply(service, plans: list[Plan]) -> tuple[int, int]:
         body: dict = {}
         if plan.add_labels:
             body["addLabelIds"] = [label_ids[name] for name in plan.add_labels]
-        if plan.archive:
+        if plan.archive and (archive_only is None or plan.judgement.email.id in archive_only):
             body["removeLabelIds"] = ["INBOX"]
+        if not body:
+            continue
 
         service.users().messages().modify(
             userId="me", id=plan.judgement.email.id, body=body
         ).execute()
 
-        if plan.add_labels:
+        if "addLabelIds" in body:
             labelled += 1
-        if plan.archive:
+        if "removeLabelIds" in body:
             archived += 1
 
     return labelled, archived

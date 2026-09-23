@@ -10,10 +10,13 @@ dependencies = [
     "beautifulsoup4",
     "python-dotenv",
     "rich",
+    "fastapi",
+    "uvicorn",
 ]
 
 [project.scripts]
 organise = "organiser.cli:main"
+organise-ui = "organiser.web:main"
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -21,3 +24,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["organiser*"]
+
+[tool.setuptools.package-data]
+organiser = ["templates/*.html"]
