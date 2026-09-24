@@ -36,5 +36,6 @@ def render_decision(command: str, judgement: Judgement, decision: Decision) -> N
     if not judgement.error:
         table.add_row("addressed", f"{judgement.addressed:.2f}")
         table.add_row("context", f"{judgement.continues_context:.2f}")
+        table.add_row("ambiguity", f"{judgement.ambiguity:.2f}")
         table.add_row("cost", format_usd(cost_usd(judgement.input_tokens)))
     console.print(table)

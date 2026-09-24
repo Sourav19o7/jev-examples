@@ -77,3 +77,22 @@ def test_verbs_needing_no_target_act_without_slots():
             Slots(), SCREEN,
         )
         assert d.action == "act", verb
+
+
+def test_ambiguous_reading_confirms_even_when_the_verb_is_confident():
+    """Misheard speech picks a near verb confidently; ambiguity is what catches it."""
+    d = decide(
+        judgement(command="close_tab", command_confidence=0.98,
+                  command_probabilities={"close_tab": 0.98}, ambiguity=1.55),
+        Slots(), SCREEN,
+    )
+    assert d.action == "confirm"
+
+
+def test_clear_reading_still_acts():
+    d = decide(
+        judgement(command="close_tab", command_confidence=1.0,
+                  command_probabilities={"close_tab": 1.0}, ambiguity=0.36),
+        Slots(), SCREEN,
+    )
+    assert d.action == "act"

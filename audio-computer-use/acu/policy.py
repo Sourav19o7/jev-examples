@@ -10,6 +10,10 @@ CONFIRM_FLOOR = 0.50
 ADDRESSED_FLOOR = 0.60
 CONTEXT_FLOOR = 0.50
 SITE_FLOOR = 0.60
+# Choice confidence saturates: among eight verbs a misheard phrase still has a
+# nearest one, so "close time" scores close_tab at 0.98. Ambiguity is the signal
+# that separates a clear reading (~0.4) from a mis-hearing (~1.6).
+AMBIGUITY_CEILING = 1.0
 
 VERBS_NEEDING_TARGET = {"search", "goto_site", "open_app", "switch_tab"}
 
@@ -61,6 +65,12 @@ def decide(judgement: Judgement, slots: Slots, screen: dict) -> Decision:
 
     if judgement.command_confidence < ACT_FLOOR:
         return Decision("confirm", verb, f"low confidence ({contest})", ranked)
+
+    if judgement.ambiguity > AMBIGUITY_CEILING:
+        return Decision(
+            "confirm", verb, f"unclear reading (ambiguity {judgement.ambiguity:.2f})",
+            ranked,
+        )
 
     if verb in VERBS_NEEDING_TARGET and not _has_target(verb, slots):
         # An omitted target is only recoverable from what is already on screen.
