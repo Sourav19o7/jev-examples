@@ -30,3 +30,23 @@ def test_targetless_verbs_build():
 def test_unknown_verb_is_rejected():
     with pytest.raises(ValueError):
         build("teleport", Slots())
+
+
+def test_empty_search_query_is_rejected():
+    with pytest.raises(ValueError):
+        build("search", Slots())
+
+
+def test_empty_site_is_rejected():
+    with pytest.raises(ValueError):
+        build("goto_site", Slots())
+
+
+def test_only_chrome_can_be_launched():
+    with pytest.raises(ValueError):
+        build("open_app", Slots(app="terminal"))
+
+
+def test_chrome_aliases_are_accepted():
+    for name in ("chrome", "Google Chrome", "google chrome"):
+        assert "Google Chrome" in build("open_app", Slots(app=name))

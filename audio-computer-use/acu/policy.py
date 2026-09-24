@@ -8,7 +8,6 @@ from acu.intent.slots import Slots
 ACT_FLOOR = 0.80
 CONFIRM_FLOOR = 0.50
 ADDRESSED_FLOOR = 0.60
-CONTEXT_FLOOR = 0.50
 SITE_FLOOR = 0.60
 # Choice confidence saturates: among eight verbs a misheard phrase still has a
 # nearest one, so "close time" scores close_tab at 0.98. Ambiguity is the signal
@@ -72,9 +71,19 @@ def decide(judgement: Judgement, slots: Slots, screen: dict) -> Decision:
             ranked,
         )
 
+    # The slot regexes route on phrasing alone, so "search github.com" extracts a
+    # query. Jev's judgement of what the target actually is breaks that tie.
+    if verb == "search" and slots.query and judgement.target_is_site >= SITE_FLOOR:
+        slots.site, slots.query = slots.query, None
+        verb = "goto_site"
+    elif verb == "goto_site" and slots.site and judgement.target_is_site < SITE_FLOOR:
+        slots.query, slots.site = slots.site, None
+        verb = "search"
+
+    # Jev can judge that a target was omitted, but it cannot supply one: its
+    # answers are distributions, never text. An unresolved target must be asked
+    # for, or the actuator would act on an empty string.
     if verb in VERBS_NEEDING_TARGET and not _has_target(verb, slots):
-        # An omitted target is only recoverable from what is already on screen.
-        if judgement.continues_context < CONTEXT_FLOOR:
-            return Decision("confirm", verb, "target missing and no context", ranked)
+        return Decision("confirm", verb, f"no target for {verb}", ranked)
 
     return Decision("act", verb, f"confident ({contest})", ranked)

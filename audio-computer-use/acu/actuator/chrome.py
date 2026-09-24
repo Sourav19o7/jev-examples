@@ -5,6 +5,15 @@ import urllib.parse
 from acu.actuator.applescript import escape, run
 from acu.intent.slots import Slots
 
+# v1 drives Chrome only, and open_app interpolates transcribed speech, so the
+# set of launchable applications is closed rather than whatever was heard.
+LAUNCHABLE = {
+    "chrome": "Google Chrome",
+    "google chrome": "Google Chrome",
+    "the browser": "Google Chrome",
+    "browser": "Google Chrome",
+}
+
 _CONTEXT_SCRIPT = """
 set appName to ""
 tell application "System Events"
@@ -27,21 +36,30 @@ end if
 
 def read_context() -> dict:
     """Read-only. Runs before Jev so the screen becomes evidence."""
+    unknown = {"frontmost_app": "unknown", "chrome_running": False,
+               "active_tab_title": "", "tab_count": 0}
     try:
         parts = run(_CONTEXT_SCRIPT).strip().split("\t")
     except (RuntimeError, OSError):
-        return {"frontmost_app": "unknown", "chrome_running": False,
-                "active_tab_title": "", "tab_count": 0}
-    app, running, title, count = (parts + ["", "", "", "0"])[:4]
+        return unknown
+    if len(parts) < 4:
+        return unknown
+    try:
+        count = int(parts[-1] or 0)
+    except ValueError:
+        count = 0
     return {
-        "frontmost_app": app,
-        "chrome_running": running == "true",
-        "active_tab_title": title,
-        "tab_count": int(count or 0),
+        "frontmost_app": parts[0],
+        "chrome_running": parts[1] == "true",
+        # A page title may itself contain a tab, so rebuild the middle.
+        "active_tab_title": "\t".join(parts[2:-1]),
+        "tab_count": count,
     }
 
 
 def _url_for(slots: Slots) -> str:
+    if not (slots.site or slots.query):
+        raise ValueError("no target to open")
     if slots.site:
         site = slots.site.strip()
         if "://" in site:
@@ -66,8 +84,10 @@ def build(verb: str, slots: Slots) -> str:
             "end tell"
         )
     if verb == "open_app":
-        app = escape((slots.app or "Google Chrome").strip())
-        return f'tell application "{app}" to activate'
+        spoken = (slots.app or "chrome").strip().lower()
+        if spoken not in LAUNCHABLE:
+            raise ValueError(f"only Chrome can be launched, not {slots.app!r}")
+        return f'tell application "{LAUNCHABLE[spoken]}" to activate'
     if verb == "new_tab":
         return (
             'tell application "Google Chrome"\n'
@@ -82,7 +102,9 @@ def build(verb: str, slots: Slots) -> str:
     if verb == "close_tab":
         return 'tell application "Google Chrome" to close active tab of front window'
     if verb == "switch_tab":
-        index = slots.ordinal or 1
+        index = slots.ordinal
+        if index is None or index == 0 or index < -1:
+            raise ValueError(f"no such tab: {slots.ordinal}")
         if index == -1:
             return (
                 'tell application "Google Chrome" to tell front window to '

@@ -96,3 +96,40 @@ def test_clear_reading_still_acts():
         Slots(), SCREEN,
     )
     assert d.action == "act"
+
+
+def test_missing_target_is_never_acted_on_even_with_context():
+    """A rescue that resolves nothing must ask, not act on an empty target."""
+    d = decide(
+        judgement(command="search", continues_context=0.95, ambiguity=0.3),
+        Slots(), SCREEN,
+    )
+    assert d.action == "confirm"
+
+
+def test_switch_tab_without_an_ordinal_asks():
+    d = decide(
+        judgement(command="switch_tab", command_probabilities={"switch_tab": 0.99},
+                  continues_context=0.95, ambiguity=0.3),
+        Slots(), SCREEN,
+    )
+    assert d.action == "confirm"
+
+
+def test_a_spoken_site_reroutes_a_search_verb_to_navigation():
+    """target_is_site breaks the search/goto tie the slot regexes cannot see."""
+    d = decide(
+        judgement(command="search", command_probabilities={"search": 0.9},
+                  target_is_site=0.9, ambiguity=0.3),
+        Slots(query="github.com"), SCREEN,
+    )
+    assert d.verb == "goto_site"
+
+
+def test_a_topic_keeps_the_search_verb():
+    d = decide(
+        judgement(command="search", command_probabilities={"search": 0.9},
+                  target_is_site=0.1, ambiguity=0.3),
+        Slots(query="global warming"), SCREEN,
+    )
+    assert d.verb == "search"

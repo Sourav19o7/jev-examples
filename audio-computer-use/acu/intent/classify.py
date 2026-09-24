@@ -34,6 +34,14 @@ async def judge(
     except TypeSafeError as exc:
         return _errored(f"{exc.__class__.__name__}: {exc}")
 
+    try:
+        return _read(response)
+    except (KeyError, AttributeError) as exc:
+        return _errored(f"malformed response: {exc}")
+
+
+def _read(response) -> Judgement:
+
     choice = response.choices["command"]
     ambiguity = response.scores["ambiguity"]
     return Judgement(

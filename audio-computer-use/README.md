@@ -69,8 +69,10 @@ rules:
   speech aimed at a person; measured at **0.09** for conversational speech.
 - Command confidence < `0.50` → ignored; between `0.50` and `0.80` → confirm.
 - **Ambiguity > `1.0` → confirm**, even at high command confidence. See below.
-- A command missing its target is rescued by screen context only when
-  `continues_context` ≥ `0.50`; otherwise it asks.
+- A command missing its target always asks. Jev can judge that a target was omitted,
+  but it cannot supply one — its answers are distributions, never text.
+- `target_is_site` ≥ `0.60` reroutes a spoken site to navigation even when the phrasing
+  looked like a search.
 - A Jev error never results in an action.
 
 #### The ambiguity gate is the one that matters
@@ -88,6 +90,7 @@ The `ambiguity` Score is what carries that signal. Measured against live Jev:
 | `"close time"` (misheard) | 0.98 | 1.55 | **confirm** |
 | `"purge everything"` | 0.96 | 2.35 | **confirm** |
 | `"yeah I'll call you back later"` | 0.61 | 3.88 | **ignored** (addressed 0.09) |
+| `"search"` (no target) | 1.00 | 2.75 | **confirm** — no target to act on |
 
 ## Setup
 
@@ -120,6 +123,13 @@ Type commands instead of speaking them — the whole pipeline except audio:
 
 ```bash
 .venv/bin/listen --dry-run --text "open chrome" "search global warming"
+```
+
+A `confirm` decision asks on stdin. `--yes` answers every confirmation with *no*, which
+is what you want for a non-interactive run:
+
+```bash
+.venv/bin/listen --dry-run --yes --text "close time"
 ```
 
 `--dry-run` prints the AppleScript instead of running it. Drop it to act for real:
@@ -172,8 +182,8 @@ Jev bills on input tokens only, at $0.042 per million. A command costs about
   seam where that would go.
 - **Wake word required.** Always-on listening is a configuration change away — the
   `addressed_to_computer` question already exists — but is not enabled.
-- **Prompts are printed, not spoken.** Confirmation is answered by voice, but the
-  question appears in the terminal.
+- **Prompts are printed, not spoken.** The question appears in the terminal; in voice
+  mode you answer it out loud ("yes"), in `--text` mode you type `y`.
 - **One command per utterance.** *"Open Chrome and search X"* is not handled.
 
 ## Tests
@@ -182,5 +192,5 @@ Jev bills on input tokens only, at $0.042 per million. A command costs about
 .venv/bin/pytest
 ```
 
-61 tests, no network and no microphone: the Jev client is faked, the actuator is built
+82 tests, no network and no microphone: the Jev client is faked, the actuator is built
 but not run, and the transcription test synthesizes its own audio with `say`.
